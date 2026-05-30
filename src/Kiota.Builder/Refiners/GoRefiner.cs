@@ -154,8 +154,6 @@ public class GoRefiner : CommonLanguageRefiner
                 true,  //forcing add as constructors are required for by factories
                 new[] { CodeClassKind.RequestConfiguration });
             cancellationToken.ThrowIfCancellationRequested();
-            MakeModelPropertiesNullable(
-                generatedCode);
             AddErrorAndStringsImportForEnums(
                 generatedCode);
             var defaultConfiguration = new GenerationConfiguration();

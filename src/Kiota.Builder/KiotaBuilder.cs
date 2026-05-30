@@ -1174,7 +1174,7 @@ public partial class KiotaBuilder
     }
     private static readonly StructuralPropertiesReservedNameProvider structuralPropertiesReservedNameProvider = new();
 
-    private CodeProperty? CreateProperty(string childIdentifier, string childType, IOpenApiSchema? propertySchema = null, CodeTypeBase? existingType = null, CodePropertyKind kind = CodePropertyKind.Custom)
+    private CodeProperty? CreateProperty(string childIdentifier, string childType, IOpenApiSchema? propertySchema = null, CodeTypeBase? existingType = null, CodePropertyKind kind = CodePropertyKind.Custom, IOpenApiSchema? parentSchema = null)
     {
         var propertyName = childIdentifier.CleanupSymbolName();
         if (structuralPropertiesReservedNameProvider.ReservedNames.Contains(propertyName))
@@ -1183,6 +1183,12 @@ public partial class KiotaBuilder
         if ((propertySchema?.Items?.IsEnum() ?? false) && resultType is CodeType codeType)
             codeType.Name = childType;
         if (resultType == null) return null;
+        if (kind == CodePropertyKind.Custom)
+        {
+            var isRequired = parentSchema?.Required?.Contains(childIdentifier, StringComparer.OrdinalIgnoreCase) ?? false;
+            var isNullable = (propertySchema?.Type & JsonSchemaType.Null) is JsonSchemaType.Null;
+            resultType.IsNullable = !isRequired || isNullable;
+        }
         var prop = new CodeProperty
         {
             Name = propertyName,
@@ -2426,7 +2432,7 @@ public partial class KiotaBuilder
                             LogOmittedPropertyInvalidSchema(x.Key, model.Name, currentNode.Path);
                             return null;
                         }
-                        return CreateProperty(x.Key, definition.Name, propertySchema: propertySchema, existingType: definition);
+                        return CreateProperty(x.Key, definition.Name, propertySchema: propertySchema, existingType: definition, parentSchema: schema);
                     })
                     .OfType<CodeProperty>()
                     .ToArray() ?? [];
@@ -2605,7 +2611,7 @@ public partial class KiotaBuilder
                 resultType = new CodeType
                 {
                     TypeDefinition = enumDeclaration,
-                    IsNullable = !parameter.Schema.IsArray()
+                    IsNullable = !parameter.Required || (parameter.Schema.Type & JsonSchemaType.Null) is JsonSchemaType.Null
                 };
                 addBackwardCompatibleParameter = true;
             }

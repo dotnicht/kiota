@@ -393,10 +393,15 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, CSharpConventionSe
             else if (currentType.TypeDefinition is CodeEnum enumType)
                 return $"GetEnumValue<{enumType.GetFullName()}>()";
         }
+        var isNonNullableValueType = !propType.IsNullable &&
+                                     propertyType != "string" &&
+                                     propertyType != "byte[]" &&
+                                     conventions.IsPrimitiveType(propertyType);
         return propertyType switch
         {
             "byte[]" => "GetByteArrayValue()",
-            _ when conventions.IsPrimitiveType(propertyType) => $"Get{propertyType.TrimEnd(CSharpConventionService.NullableMarker).ToFirstCharacterUpperCase()}Value()",
+            _ when conventions.IsPrimitiveType(propertyType) =>
+                $"Get{propertyType.TrimEnd(CSharpConventionService.NullableMarker).ToFirstCharacterUpperCase()}Value(){(isNonNullableValueType ? ".GetValueOrDefault()" : string.Empty)}",
             _ => $"GetObjectValue<{propertyType}>({propertyType}.CreateFromDiscriminatorValue)",
         };
     }

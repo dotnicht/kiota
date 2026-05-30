@@ -13,7 +13,11 @@ public class CodePropertyWriter : BaseElementWriter<CodeProperty, CSharpConventi
         ArgumentNullException.ThrowIfNull(writer);
         if (codeElement.ExistsInExternalBaseType) return;
         var propertyType = conventions.GetTypeString(codeElement.Type, codeElement);
-        var isNullableReferenceType = !propertyType.EndsWith('?')
+        // The #nullable enable block is only needed for reference types.
+        // Value types (int, bool, Guid, etc.) already get a '?' suffix via ShouldTypeHaveNullableMarker,
+        // so wrapping them would produce double-nullable syntax like 'bool??'.
+        var isNullableReferenceType = codeElement.Type.IsNullable
+                                      && !propertyType.EndsWith('?')
                                       && codeElement.IsOfKind(
                                             CodePropertyKind.Custom,
                                             CodePropertyKind.QueryParameter);// Other property types are appropriately constructor initialized

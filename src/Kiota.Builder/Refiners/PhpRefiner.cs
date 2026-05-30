@@ -83,7 +83,6 @@ public class PhpRefiner : CommonLanguageRefiner
             cancellationToken.ThrowIfCancellationRequested();
             cancellationToken.ThrowIfCancellationRequested();
             CorrectParameterType(generatedCode);
-            MakeModelPropertiesNullable(generatedCode);
             cancellationToken.ThrowIfCancellationRequested();
             AddDiscriminatorMappingsUsingsToParentClasses(
                 generatedCode,
