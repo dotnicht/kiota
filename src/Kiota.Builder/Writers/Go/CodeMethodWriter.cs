@@ -808,6 +808,17 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             (null, false) when property.Type.AllTypes.First().Name.Equals(GoRefiner.UntypedNodeName, StringComparison.OrdinalIgnoreCase) => (GetTypeAssertion("val", $"{propertyTypeImportName}"), string.Empty, true),
             _ => ("val", string.Empty, true),
         };
+        // When the property is non-nullable and a primitive value type (setter takes T not *T), dereference
+        // the pointer returned by the deserialization method. The nil-guard above makes this safe.
+        // ByteArray ([]byte) is a reference type: GetByteArrayValue returns []byte directly, not *[]byte.
+        var isStreamType = conventions.StreamTypeName.Equals(propertyTypeImportName, StringComparison.OrdinalIgnoreCase);
+        if (!property.Type.IsNullable && property.Type.CollectionKind == CodeTypeBase.CodeTypeCollectionKind.None && !isStreamType)
+        {
+            if (valueArgument == "val")
+                valueArgument = "*val";
+            else if (property.Type.AllTypes.First().TypeDefinition is CodeEnum && valueArgument == GetTypeAssertion("val", $"*{propertyTypeImportName}"))
+                valueArgument = $"*{valueArgument}"; // dereference *EnumType pointer → EnumType value
+        }
         if (property.Type.CollectionKind != CodeTypeBase.CodeTypeCollectionKind.None)
             WriteCollectionCast(propertyTypeImportName, "val", "res", writer, pointerSymbol, dereference);
         writer.WriteLine($"m.{property.Setter.Name.ToFirstCharacterUpperCase()}({valueArgument})");
@@ -1092,12 +1103,15 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
         var isEnum = propType is CodeType eType && eType.TypeDefinition is CodeEnum;
         var isComplexType = propType is CodeType cType && (cType.TypeDefinition is CodeClass || cType.TypeDefinition is CodeInterface || cType.Name.Equals(GoRefiner.UntypedNodeName, StringComparison.OrdinalIgnoreCase));
         var isInterface = propType is CodeType iType && iType.TypeDefinition is CodeInterface;
+        var isNonNullableEnum = isEnum && !propType.IsCollection && !propType.IsNullable;
         if (addBlockForErrorScope)
-            if (isEnum || propType.IsCollection)
+            if ((isEnum && !isNonNullableEnum) || propType.IsCollection)
                 writer.StartBlock($"if {valueGet} != nil {{");
             else
                 writer.StartBlock();// so the err var scope is limited
-        if (isEnum && !propType.IsCollection)
+        if (isNonNullableEnum)
+            writer.WriteLine($"cast := {valueGet}.String()");
+        else if (isEnum && !propType.IsCollection)
             writer.WriteLine($"cast := (*{valueGet}).String()");
         else if (isComplexType && propType.IsCollection)
         {
@@ -1133,6 +1147,16 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, GoConventionServic
             propertyTypeName = "String";
         else if (conventions.StreamTypeName.Equals(propertyTypeName, StringComparison.OrdinalIgnoreCase))
             propertyTypeName = "ByteArray";
+        // When the property is non-nullable and a primitive value type, the getter returns T (not *T).
+        // Writer methods expect *T, so capture the value in a temp variable and take its address.
+        // ByteArray ([]byte) is a reference type: WriteByteArrayValue takes []byte directly, no pointer needed.
+        var isNonNullablePrimitive = !isEnum && !isComplexType && !propType.IsCollection && !propType.IsNullable
+            && !"ByteArray".Equals(propertyTypeName, StringComparison.Ordinal);
+        if (isNonNullablePrimitive)
+        {
+            writer.WriteLine($"v := {reference}");
+            reference = "&v";
+        }
         writer.WriteLine($"{errorPrefix}Write{collectionPrefix}{propertyTypeName}Value{collectionSuffix}({serializationKey}, {reference})");
         WriteReturnError(writer);
         if (addBlockForErrorScope)

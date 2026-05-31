@@ -386,12 +386,16 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, CSharpConventionSe
                 if (currentType.TypeDefinition == null)
                     return $"GetCollectionOfPrimitiveValues<{propertyType}>(){collectionMethod}";
                 else if (currentType.TypeDefinition is CodeEnum)
-                    return $"GetCollectionOfEnumValues<{propertyType.TrimEnd('?')}>(){collectionMethod}";
+                {
+                    var baseEnumType = propertyType.TrimEnd('?');
+                    var selectNonNull = !propertyType.EndsWith('?') ? "?.Select(x => x!.Value)" : string.Empty;
+                    return $"GetCollectionOfEnumValues<{baseEnumType}>(){selectNonNull}{collectionMethod}";
+                }
                 else
                     return $"GetCollectionOfObjectValues<{propertyType}>({propertyType}.CreateFromDiscriminatorValue){collectionMethod}";
             }
             else if (currentType.TypeDefinition is CodeEnum enumType)
-                return $"GetEnumValue<{enumType.GetFullName()}>()";
+                return $"GetEnumValue<{enumType.GetFullName()}>(){(!propType.IsNullable ? ".GetValueOrDefault()" : string.Empty)}";
         }
         var isNonNullableValueType = !propType.IsNullable &&
                                      propertyType != "string" &&
@@ -508,7 +512,17 @@ public class CodeMethodWriter : BaseElementWriter<CodeMethod, CSharpConventionSe
                                         .OrderBy(static x => x.Name))
         {
             var serializationMethodName = GetSerializationMethodName(otherProp.Type, method);
-            writer.WriteLine($"writer.{serializationMethodName}(\"{otherProp.WireName.SanitizeDoubleQuote()}\", {otherProp.Name.ToFirstCharacterUpperCase()});");
+            string propValue;
+            if (otherProp.Type is CodeType serPropType && serPropType.TypeDefinition is CodeEnum && !otherProp.Type.IsNullable)
+            {
+                var enumTypeName = conventions.GetTypeString(otherProp.Type, method, false);
+                propValue = otherProp.Type.CollectionKind != CodeTypeBase.CodeTypeCollectionKind.None
+                    ? $"{otherProp.Name.ToFirstCharacterUpperCase()}?.Select(x => ({enumTypeName.TrimEnd('?')}?)x)"
+                    : $"({enumTypeName}?){otherProp.Name.ToFirstCharacterUpperCase()}";
+            }
+            else
+                propValue = otherProp.Name.ToFirstCharacterUpperCase();
+            writer.WriteLine($"writer.{serializationMethodName}(\"{otherProp.WireName.SanitizeDoubleQuote()}\", {propValue});");
         }
     }
     private void WriteSerializerBodyForUnionModel(CodeMethod method, CodeClass parentClass, LanguageWriter writer)
