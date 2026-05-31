@@ -23,6 +23,11 @@ public abstract class CodeTypeBase : CodeTerminal, ICloneable
         get; set;
     }
     public bool IsNullable { get; set; } = true;
+    /// <summary>
+    /// True when the schema explicitly declared the type as nullable (e.g. nullable:true or type includes null).
+    /// Unlike IsNullable, this is not set for properties that are merely optional.
+    /// </summary>
+    public bool IsExplicitlyNullable { get; set; }
     public CodeTypeCollectionKind CollectionKind { get; set; } = CodeTypeCollectionKind.None;
     public bool IsCollection
     {
@@ -43,6 +48,7 @@ public abstract class CodeTypeBase : CodeTerminal, ICloneable
         ArgumentNullException.ThrowIfNull(source);
         ActionOf = source.ActionOf;
         IsNullable = source.IsNullable;
+        IsExplicitlyNullable = source.IsExplicitlyNullable;
         CollectionKind = source.CollectionKind;
         if (cloneName)
             Name = source.Name;

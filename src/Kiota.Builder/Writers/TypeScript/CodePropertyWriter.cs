@@ -45,8 +45,32 @@ public class CodePropertyWriter : BaseElementWriter<CodeProperty, TypeScriptConv
                 writer.WriteLine($"{codeElement.Name.ToFirstCharacterLowerCase()}?: {returnType}{(isFlagEnum ? "[]" : string.Empty)};");
                 break;
             default:
-                writer.WriteLine($"{codeElement.Name.ToFirstCharacterLowerCase()}?: {returnType}{(isFlagEnum ? "[]" : string.Empty)} | null;");
+                WriteDefaultProperty(codeElement, writer, returnType, isFlagEnum);
                 break;
+        }
+    }
+
+    private static void WriteDefaultProperty(CodeProperty codeElement, LanguageWriter writer, string returnType, bool isFlagEnum)
+    {
+        var name = codeElement.Name.ToFirstCharacterLowerCase();
+        var enumSuffix = isFlagEnum ? "[]" : string.Empty;
+        var isNullable = codeElement.Type.IsNullable;
+        var isExplicit = codeElement.Type.IsExplicitlyNullable;
+
+        if (!isNullable)
+        {
+            // required non-nullable: no ? modifier, no null/undefined suffix
+            writer.WriteLine($"{name}: {returnType}{enumSuffix};");
+        }
+        else if (isExplicit)
+        {
+            // explicitly nullable (required nullable or optional nullable)
+            writer.WriteLine($"{name}?: {returnType}{enumSuffix} | null | undefined;");
+        }
+        else
+        {
+            // optional non-nullable: ? modifier, undefined only
+            writer.WriteLine($"{name}?: {returnType}{enumSuffix} | undefined;");
         }
     }
 }

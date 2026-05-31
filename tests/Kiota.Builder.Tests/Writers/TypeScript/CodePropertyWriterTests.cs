@@ -72,11 +72,35 @@ public sealed class CodePropertyWriterTests : IDisposable
     [Fact]
     public void WritesCustomPropertyWithDefaultedNullType()
     {
+        // IsNullable=true (default), IsExplicitlyNullable=false (default) → optional non-nullable
         property.Kind = CodePropertyKind.Custom;
         writer.Write(property);
         var result = tw.ToString();
-        Assert.Contains($"{PropertyName}?: {TypeName} | null", result);
-        Assert.DoesNotContain("| undefined", result); // redundant with ?
+        Assert.Contains($"{PropertyName}?: {TypeName} | undefined", result);
+        Assert.DoesNotContain("| null", result);
+    }
+
+    [Fact]
+    public void WritesNonNullableRequiredProperty()
+    {
+        property.Kind = CodePropertyKind.Custom;
+        property.Type = new CodeType { Name = TypeName, IsNullable = false };
+        writer.Write(property);
+        var result = tw.ToString();
+        Assert.Contains($"{PropertyName}: {TypeName}", result);
+        Assert.DoesNotContain("?", result);
+        Assert.DoesNotContain("| null", result);
+        Assert.DoesNotContain("| undefined", result);
+    }
+
+    [Fact]
+    public void WritesExplicitlyNullableProperty()
+    {
+        property.Kind = CodePropertyKind.Custom;
+        property.Type = new CodeType { Name = TypeName, IsNullable = true, IsExplicitlyNullable = true };
+        writer.Write(property);
+        var result = tw.ToString();
+        Assert.Contains($"{PropertyName}?: {TypeName} | null | undefined", result);
     }
     [Fact]
     public void WritesFlagEnums()
@@ -127,6 +151,7 @@ public sealed class CodePropertyWriterTests : IDisposable
     [Fact]
     public void WritesCorrectTypeForProperty()
     {
+        // default IsNullable=true, IsExplicitlyNullable=false → optional non-nullable
         property.Kind = CodePropertyKind.Custom;
         property.Type = new CodeType
         {
@@ -134,7 +159,8 @@ public sealed class CodePropertyWriterTests : IDisposable
         };
         writer.Write(property);
         var result = tw.ToString();
-        Assert.Contains($"{PropertyName}?: ArrayBuffer | null", result);
+        Assert.Contains($"{PropertyName}?: ArrayBuffer | undefined", result);
+        Assert.DoesNotContain("| null", result);
     }
     [Fact]
     public void DoesNodeEmitAdditionalDataPropertyOnInterfaces()

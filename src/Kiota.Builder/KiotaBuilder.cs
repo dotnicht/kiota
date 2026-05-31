@@ -1188,6 +1188,7 @@ public partial class KiotaBuilder
             var isRequired = parentSchema?.Required?.Contains(childIdentifier, StringComparer.OrdinalIgnoreCase) ?? false;
             var isNullable = (propertySchema?.Type & JsonSchemaType.Null) is JsonSchemaType.Null;
             resultType.IsNullable = !isRequired || isNullable;
+            resultType.IsExplicitlyNullable = isNullable;
         }
         var prop = new CodeProperty
         {
